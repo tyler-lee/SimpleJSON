@@ -13,6 +13,23 @@ SimpleJSON should work on any platform; it's only requirement is a C++11 compati
 ## API
 You can find the API [over here](API.md). For now it's just a Markdown file with C++ syntax highlighting, but it's better than nothing!
 
+## Run In SGX
+You can call json APIs with SGX enclave, by:
+* Implementing an ocall `ocall_print_string(const char*)` to print error message, and then implementing `printf` within enclave as follow.
+  ```C
+  int printf(const char* fmt, ...)
+  {
+      char buf[BUFSIZ] = { '\0' };
+      va_list ap;
+      va_start(ap, fmt);
+      vsnprintf(buf, BUFSIZ, fmt, ap);
+      va_end(ap);
+      ocall_print_string(buf);
+      return (int)strnlen(buf, BUFSIZ - 1) + 1;
+  }
+  ```
+* Compiling the SGX trusted code (enclave code) with `-D__SGX_MODE__`
+
 ## Upcoming Features
 SimpleJSON is still missing some features, which I hope to get done soon!
 * Write more test cases to cover all major components( mostly parsing )
