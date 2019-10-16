@@ -1,5 +1,5 @@
-
-#pragma once
+#ifndef __JSON_SGX_H__
+#define __JSON_SGX_H__
 
 #include <cstdint>
 #include <cmath>
@@ -11,6 +11,15 @@
 #include <initializer_list>
 #include <ostream>
 #include <iostream>
+
+#ifdef __SGX_MODE__
+    /*
+    * printf:
+    *   Invokes OCALL to display the enclave buffer to the terminal.
+    *   Should be implemented as an OCall.
+    */
+    extern int printf(const char* fmt, ...);
+#endif // End __SGX_MODE__
 
 namespace json {
 
@@ -98,8 +107,8 @@ class JSON
 
         JSON() : Internal(), Type( Class::Null ){}
 
-        JSON( initializer_list<JSON> list ) 
-            : JSON() 
+        JSON( initializer_list<JSON> list )
+            : JSON()
         {
             SetType( Class::Object );
             for( auto i = list.begin(), e = list.end(); i != e; ++i, ++i )
@@ -123,17 +132,17 @@ class JSON
         JSON( const JSON &other ) {
             switch( other.Type ) {
             case Class::Object:
-                Internal.Map = 
+                Internal.Map =
                     new map<string,JSON>( other.Internal.Map->begin(),
                                           other.Internal.Map->end() );
                 break;
             case Class::Array:
-                Internal.List = 
+                Internal.List =
                     new deque<JSON>( other.Internal.List->begin(),
                                       other.Internal.List->end() );
                 break;
             case Class::String:
-                Internal.String = 
+                Internal.String =
                     new string( *other.Internal.String );
                 break;
             default:
@@ -146,17 +155,17 @@ class JSON
             ClearInternal();
             switch( other.Type ) {
             case Class::Object:
-                Internal.Map = 
+                Internal.Map =
                     new map<string,JSON>( other.Internal.Map->begin(),
                                           other.Internal.Map->end() );
                 break;
             case Class::Array:
-                Internal.List = 
+                Internal.List =
                     new deque<JSON>( other.Internal.List->begin(),
                                       other.Internal.List->end() );
                 break;
             case Class::String:
-                Internal.String = 
+                Internal.String =
                     new string( *other.Internal.String );
                 break;
             default:
@@ -328,7 +337,7 @@ class JSON
         }
 
 
-        JSONConstWrapper<deque<JSON>> ArrayRange() const { 
+        JSONConstWrapper<deque<JSON>> ArrayRange() const {
             if( Type == Class::Array )
                 return JSONConstWrapper<deque<JSON>>( Internal.List );
             return JSONConstWrapper<deque<JSON>>( nullptr );
@@ -377,7 +386,9 @@ class JSON
             return "";
         }
 
+#ifndef __SGX_MODE__
         friend std::ostream& operator<<( std::ostream&, const JSON & );
+#endif // End __SGX_MODE__
 
     private:
         void SetType( Class type ) {
@@ -385,7 +396,7 @@ class JSON
                 return;
 
             ClearInternal();
-          
+
             switch( type ) {
             case Class::Null:      Internal.Map    = nullptr;                break;
             case Class::Object:    Internal.Map    = new map<string,JSON>(); break;
@@ -400,9 +411,9 @@ class JSON
         }
 
     private:
-      /* beware: only call if YOU know that Internal is allocated. No checks performed here. 
-         This function should be called in a constructed JSON just before you are going to 
-        overwrite Internal... 
+      /* beware: only call if YOU know that Internal is allocated. No checks performed here.
+         This function should be called in a constructed JSON just before you are going to
+        overwrite Internal...
       */
       void ClearInternal() {
         switch( Type ) {
@@ -433,10 +444,12 @@ JSON Object() {
     return std::move( JSON::Make( JSON::Class::Object ) );
 }
 
+#ifndef __SGX_MODE__
 std::ostream& operator<<( std::ostream &os, const JSON &json ) {
     os << json.dump();
     return os;
 }
+#endif // End __SGX_MODE__
 
 namespace {
     JSON parse_next( const string &, size_t & );
@@ -458,13 +471,17 @@ namespace {
             JSON Key = parse_next( str, offset );
             consume_ws( str, offset );
             if( str[offset] != ':' ) {
-                std::cerr << "Error: Object: Expected colon, found '" << str[offset] << "'\n";
+#ifndef __SGX_MODE__
+                std::cerr << "ERROR: Object: Expected colon, found '" << str[offset] << "'\n";
+#else
+                printf("ERROR: Object: Expected colon, found '%s'\n", str[offset]);
+#endif // End __SGX_MODE__
                 break;
             }
             consume_ws( str, ++offset );
             JSON Value = parse_next( str, offset );
             Object[Key.ToString()] = Value;
-            
+
             consume_ws( str, offset );
             if( str[offset] == ',' ) {
                 ++offset; continue;
@@ -473,7 +490,11 @@ namespace {
                 ++offset; break;
             }
             else {
+#ifndef __SGX_MODE__
                 std::cerr << "ERROR: Object: Expected comma, found '" << str[offset] << "'\n";
+#else
+                printf("ERROR: Object: Expected comma, found '%s'\n", str[offset]);
+#endif // End __SGX_MODE__
                 break;
             }
         }
@@ -484,7 +505,7 @@ namespace {
     JSON parse_array( const string &str, size_t &offset ) {
         JSON Array = JSON::Make( JSON::Class::Array );
         unsigned index = 0;
-        
+
         ++offset;
         consume_ws( str, offset );
         if( str[offset] == ']' ) {
@@ -502,7 +523,11 @@ namespace {
                 ++offset; break;
             }
             else {
+#ifndef __SGX_MODE__
                 std::cerr << "ERROR: Array: Expected ',' or ']', found '" << str[offset] << "'\n";
+#else
+                printf("ERROR: Array: Expected ',' or ']', found '%s'\n", str[offset]);
+#endif // End __SGX_MODE__
                 return std::move( JSON::Make( JSON::Class::Array ) );
             }
         }
@@ -531,7 +556,11 @@ namespace {
                         if( (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') )
                             val += c;
                         else {
+#ifndef __SGX_MODE__
                             std::cerr << "ERROR: String: Expected hex character in unicode escape, found '" << c << "'\n";
+#else
+                            printf("ERROR: String: Expected hex character in unicode escape, found '%c'\n", c);
+#endif // End __SGX_MODE__
                             return std::move( JSON::Make( JSON::Class::String ) );
                         }
                     }
@@ -559,7 +588,7 @@ namespace {
             if( (c == '-') || (c >= '0' && c <= '9') )
                 val += c;
             else if( c == '.' ) {
-                val += c; 
+                val += c;
                 isDouble = true;
             }
             else
@@ -573,7 +602,11 @@ namespace {
                 if( c >= '0' && c <= '9' )
                     exp_str += c;
                 else if( !isspace( c ) && c != ',' && c != ']' && c != '}' ) {
+#ifndef __SGX_MODE__
                     std::cerr << "ERROR: Number: Expected a number for exponent, found '" << c << "'\n";
+#else
+                    printf("ERROR: Number: Expected a number for exponent, found '%c'\n", c);
+#endif // End __SGX_MODE__
                     return std::move( JSON::Make( JSON::Class::Null ) );
                 }
                 else
@@ -582,11 +615,15 @@ namespace {
             exp = std::stol( exp_str );
         }
         else if( !isspace( c ) && c != ',' && c != ']' && c != '}' ) {
+#ifndef __SGX_MODE__
             std::cerr << "ERROR: Number: unexpected character '" << c << "'\n";
+#else
+            printf("ERROR: Number: unexpected character '%c'\n", c);
+#endif // End __SGX_MODE__
             return std::move( JSON::Make( JSON::Class::Null ) );
         }
         --offset;
-        
+
         if( isDouble )
             Number = std::stod( val ) * std::pow( 10, exp );
         else {
@@ -605,7 +642,11 @@ namespace {
         else if( str.substr( offset, 5 ) == "false" )
             Bool = false;
         else {
+#ifndef __SGX_MODE__
             std::cerr << "ERROR: Bool: Expected 'true' or 'false', found '" << str.substr( offset, 5 ) << "'\n";
+#else
+            printf("ERROR: Bool: Expected 'true' or 'false', found '%s'\n", str.substr( offset, 5 ));
+#endif // End __SGX_MODE__
             return std::move( JSON::Make( JSON::Class::Null ) );
         }
         offset += (Bool.ToBool() ? 4 : 5);
@@ -615,7 +656,11 @@ namespace {
     JSON parse_null( const string &str, size_t &offset ) {
         JSON Null;
         if( str.substr( offset, 4 ) != "null" ) {
+#ifndef __SGX_MODE__
             std::cerr << "ERROR: Null: Expected 'null', found '" << str.substr( offset, 4 ) << "'\n";
+#else
+            printf("ERROR: Null: Expected 'null', found '%s'\n", str.substr( offset, 4 ));
+#endif // End __SGX_MODE__
             return std::move( JSON::Make( JSON::Class::Null ) );
         }
         offset += 4;
@@ -636,7 +681,11 @@ namespace {
             default  : if( ( value <= '9' && value >= '0' ) || value == '-' )
                            return std::move( parse_number( str, offset ) );
         }
+#ifndef __SGX_MODE__
         std::cerr << "ERROR: Parse: Unknown starting character '" << value << "'\n";
+#else
+        printf("ERROR: Parse: Unknown starting character '%c'\n", value);
+#endif // End __SGX_MODE__
         return JSON();
     }
 }
@@ -647,3 +696,5 @@ JSON JSON::Load( const string &str ) {
 }
 
 } // End Namespace json
+
+#endif // End __JSON_SGX_H__
