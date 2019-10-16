@@ -114,7 +114,7 @@ namespace json {
         void append( any_type [, ... ] );
 
         /// Dumps the JSON object to a string format for storing.
-        void dump( int depth = 0, string indent = "  " );
+        void dump( int depth = 1, string indent = "  " );
 
         /// Get the JSON::Class type for a JSON object.
         JSON::Class JSONType();
