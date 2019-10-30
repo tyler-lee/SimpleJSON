@@ -289,6 +289,16 @@ class JSON
                 return -1;
         }
 
+        int erase( const string &key ) const {
+            Internal.Map->erase( key );
+            return size();
+        }
+
+        void erase( unsigned index ) const {
+            Internal.List->erase( Internal.List->begin() + index );
+            return size();
+        }
+
         Class JSONType() const { return Type; }
 
         /// Functions for getting primitives from the JSON object.
@@ -297,7 +307,8 @@ class JSON
         string ToString() const { bool b; return std::move( ToString( b ) ); }
         string ToString( bool &ok ) const {
             ok = (Type == Class::String);
-            return ok ? std::move( json_escape( *Internal.String ) ): string("");
+            return ok ? std::move( string(*Internal.String) ): string("");
+            //return ok ? std::move( json_escape( *Internal.String ) ): string("");
         }
 
         double ToFloat() const { bool b; return ToFloat( b ); }
